@@ -1,17 +1,34 @@
-name: iOS
+name: iOS Tests
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
-    runs-on: macos-15
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Show Xcode environment
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list devices available
 
       - name: List Xcode schemes
         run: |
@@ -51,18 +68,6 @@ jobs:
           UDID="${DEVICE##*|}"
           echo "Selected simulator: $DEVICE"
           echo "destination=platform=iOS Simulator,id=$UDID" >> "$GITHUB_OUTPUT"
-
-      - name: Build
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project synclifters.xcodeproj \
-            -scheme synclifters \
-            -configuration Debug \
-            -destination "${{ steps.simulator.outputs.destination }}" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
-            build
 
       - name: Run tests
         run: |
